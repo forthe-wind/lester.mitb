@@ -1,0 +1,236 @@
+
+#Loading the datasets
+
+```{r}
+path = "~/Library/Mobile Documents/com~apple~CloudDocs/SMU MITB/ISSS616 - Applied Statistical Analysis with R/Group Project/"
+happy = read.csv(paste0(path, "Chapter2OnlineData.csv"))
+countries = read.csv(paste0(path, "countries of the world.csv"), dec=',')
+world = read.csv(paste0(path, "world.csv"), na.string='..')
+head(happy)
+head(countries)
+head(world)
+```
+
+#Checking the dimension of the data
+
+```{r}
+print(dim(happy))
+print(dim(countries))
+print(dim(world))
+```
+
+#Checking happiness dataset (overall)
+
+```{r}
+str(happy)
+```
+
+#Checking happiness dataset (NA value)
+```{r}
+par(mar=c(10,4,4,4))
+plt <- barplot(sapply(happy, function(x) sum(is.na(x))), xlab="", col='steelblue', xaxt="n",
+               ylab = "frequency")
+text(plt, par("usr")[3], labels=colnames(happy), srt=60, xpd=T, cex=0.5, adj=1)
+title("NA in each column")
+mtext(side=1, text="columns", line=9)
+```
+
+# Remove columns with lots of missing data and useless columns [15:17], [19:]
+
+```{r}
+happy = happy[-c(15:17, 19:26)]
+colnames(happy)
+```
+
+
+# Calculate the mean values for all attributes from year 2011 to 2018
+# remove all columns except country, attribute and average
+# further remove garbage rows at the end
+
+```{r}
+world$average = rowMeans(world[,5:12], na.rm=TRUE)
+world = world[c(1, 3, 13)]
+world = world[1:3689,]
+```
+
+# Convert the long format to short format
+```{r}
+library(tidyverse)
+world = world %>%
+  spread(Series.Name, average)
+```
+
+#Checking countries dataset for missing data
+```{r}
+sapply(world, function(x) sum(is.na(x)))
+```
+
+# What are the two countries with missing 'Land area (sq. km)'?
+```{r}
+world[which(is.na(world['Land area (sq. km)'])),]
+```
+
+# Remove columns with more than 25 missing countries
+```{r}
+world = world[colnames(world)[sapply(world, function(x) sum(is.na(x))) < 25]]
+```
+
+# Merging happiness and world dataset
+```{r}
+new_table = left_join(x=happy, y=world, by=c("Country.name" = "Country.Name") )
+head(new_table)
+```
+
+# Examine the new table - countries that are not matched
+```{r}
+unique(new_table[is.na(new_table['Land area (sq. km)']),][['Country.name']])
+```
+
+# Need to change the names manually
+Congo (Brazzaville) -> Congo, Repub. of the 
+Congo (Kinshasa) -> Congo, Dem. Rep
+Egypt -> Egypt, Arab Rep.
+Gambia -> Gambia, The
+Hong Kong S.A.R. of China -> Hong Kong SAR, China
+Iran -> Iran, Islamic Rep.
+Ivory Coast -> Cote d'Ivoire
+Kyrgyzstan -> Kyrgyz Republic
+Laos -> Lao PDR
+Macedonia -> North Macedonia
+North Cyprus -> Cyprus
+Palestinian Territories -> West Bank and Gaza
+Russia -> Russian Federation
+Slovakia -> Slovak Republic
+Somaliland region -> Somalia
+South Korea -> Korea, Rep.
+Swaziland -> Eswatini
+Syria -> Syrian Arab Republic
+Taiwan Province of China -> ***MISSING***
+Venezuela -> Venezuela, RB
+Yemen -> Yemen, Rep.
+
+
+```{r}
+## in happy dataset
+from_c = c('Congo (Brazzaville)', 'Congo (Kinshasa)', 'Egypt', 'Gambia',
+           'Hong Kong S.A.R. of China', 'Iran', 'Ivory Coast', 'Kyrgyzstan',
+           'Laos', 'Macedonia', 'North Cyprus', 'Palestinian Territories',
+           'Russia', 'Slovakia', 'South Korea', 'Swaziland', 'Syria',
+           'Venezuela', 'Yemen', 'Somaliland region')
+## in world dataset
+to_c = c('Congo, Rep.', 'Congo, Dem. Rep.', 'Egypt, Arab Rep.', 'Gambia, The',
+         'Hong Kong SAR, China', 'Iran, Islamic Rep.', 'Cote d\'Ivoire', 'Kyrgyz Republic',
+         'Lao PDR', 'North Macedonia', 'Cyprus', 'West Bank and Gaza',
+         'Russian Federation', 'Slovak Republic', 'Korea, Rep.',
+         'Eswatini', 'Syrian Arab Republic', 'Venezuela, RB', 'Yemen, Rep.', 'Somalia')
+lookup = data.frame(from_c, to_c)
+happy$Country.name <- as.character(happy$Country.name)
+index_to_replace = which(!is.na(match(happy$Country.name, lookup$from_c)))
+
+# replacing country name
+happy$Country.name[index_to_replace] = as.character(lookup$to_c[match(happy$Country.name,
+                                                                     lookup$from_c)][index_to_replace])
+```
+
+#Rejoin table
+```{r}
+world$Country.Name = as.character(world$Country.Name)
+new_table = left_join(x=happy, y=world, by=c("Country.name" = "Country.Name") )
+unique(new_table[is.na(new_table['Land area (sq. km)']),][['Country.name']])
+```
+
+
+```{r}
+str(countries)
+```
+
+# Just to retrieve the region information
+```{r}
+countries <- countries[c('Country', 'Region')]
+```
+
+
+# Merging happiness and countries dataset
+# first to remove the stupid trailing whitespace in the country name
+```{r}
+levels(countries$Country) = sapply(levels(countries$Country), trimws, which="right")
+new_table2 = left_join(x=new_table, y=countries, by=c("Country.name" = "Country") )
+head(new_table2)
+```
+
+# Examine the new table - countries that are not matched
+```{r}
+unique(new_table2[is.na(new_table2$Region),][['Country.name']])
+```
+
+# Need to change the names manually
+Bosnia and Herzegovina -> Bosnia & Herzegovina
+Central Africa Republic -> Central African Rep.
+Congo, Rep. -> Congo, Repub. of the 
+Egypt, Arab Rep. -> Egypt 
+Hong Kong SAR, China -> Hong Kong
+Iran, Islamic Rep. -> Iran
+Kosovo -> ****NO DATA****
+Kyrgyz Republic -> Kyrgyzstan 
+Lao PDR -> Laos
+North Macedonia -> Macedonia
+Montenegro -> ****NO DATA****
+Myanmar -> Burma
+West Bank and Gaza -> West Bank
+Russian Federation -> Russia
+Slovak Republic -> Slovakia
+Korea, Rep. -> Korea, South
+South Sudan -> Sudan
+Eswatini -> Swaziland
+Syrian Arab Republic -> Syria
+Taiwan Province of China -> Taiwan
+Trinidad and Tobago -> Trinidad & Tobago
+Venezuela, RB -> Venezuela 
+Yemen, Rep. -> Yemen
+
+
+```{r}
+## in happy dataset
+from_c = c('Bosnia and Herzegovina', 'Central African Republic', 'Congo, Rep.' ,
+           'Egypt, Arab Rep.', 'Hong Kong SAR, China', 'Iran, Islamic Rep.', 'Kyrgyz Republic',
+           'Lao PDR', 'North Macedonia', 'Myanmar', 'West Bank and Gaza', 'Russian Federation',
+           'Slovak Republic', 'Korea, Rep.', 'South Sudan', 'Eswatini', 'Syrian Arab Republic',
+           'Taiwan Province of China', 'Trinidad and Tobago', 'Venezuela, RB', 'Yemen, Rep.')
+## in countries dataset
+to_c = c('Bosnia & Herzegovina', 'Central African Rep.', 'Congo, Repub. of the', 
+         'Egypt', 'Hong Kong', 'Iran', 'Kyrgyzstan',
+         'Laos', 'Macedonia', 'Burma', 'West Bank', 'Russia',
+         'Slovakia', 'Korea, South', 'Sudan', 'Swaziland', 'Syria',
+         'Taiwan', 'Trinidad & Tobago', 'Venezuela', 'Yemen')
+lookup = data.frame(from_c, to_c)
+new_table$Country.name <- as.character(new_table$Country.name)
+index_to_replace = which(!is.na(match(new_table$Country.name, lookup$from_c)))
+
+# replacing country names from new_table
+new_table$Country.name[index_to_replace] = as.character(lookup$to_c[match(new_table$Country.name,
+                                                                     lookup$from_c)][index_to_replace])
+```
+
+
+```{r}
+unique(new_table$Country.name)
+```
+
+
+#Rejoin table
+```{r}
+countries$Country = as.character(countries$Country)
+new_table2 = left_join(x=new_table, y=countries, by=c("Country.name" = "Country") )
+unique(new_table2[is.na(new_table2$Region),][['Country.name']])
+```
+
+
+# Two countries without region = "Kosovo and Montenegro"
+```{r}
+str(new_table2)
+```
+
+```{r}
+write_csv(new_table2, 'merged_dataset.csv')
+```
+
